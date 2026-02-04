@@ -2,7 +2,6 @@ import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
 export class CreateHotTables1707000001000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Create meters_current table
     await queryRunner.createTable(
       new Table({
         name: 'meters_current',
@@ -40,7 +39,6 @@ export class CreateHotTables1707000001000 implements MigrationInterface {
       true,
     );
 
-    // Create vehicles_current table
     await queryRunner.createTable(
       new Table({
         name: 'vehicles_current',
@@ -88,7 +86,6 @@ export class CreateHotTables1707000001000 implements MigrationInterface {
       true,
     );
 
-    // Create vehicle_meter_mapping table
     await queryRunner.createTable(
       new Table({
         name: 'vehicle_meter_mapping',
@@ -120,7 +117,6 @@ export class CreateHotTables1707000001000 implements MigrationInterface {
       true,
     );
 
-    // Create index on meter_id for faster lookups
     await queryRunner.query(
       `CREATE INDEX idx_mapping_meter_id ON vehicle_meter_mapping(meter_id)`,
     );

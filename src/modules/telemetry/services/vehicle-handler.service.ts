@@ -20,9 +20,7 @@ export class VehicleHandlerService {
   async processVehicleReading(reading: VehicleReadingDto): Promise<void> {
     const recordedAt = new Date(reading.timestamp);
 
-    // Dual-write pattern using transaction
     await this.dataSource.transaction(async (manager) => {
-      // Write 1: Insert into history table (append-only)
       await manager.insert(VehicleHistory, {
         vehicleId: reading.vehicleId,
         soc: reading.soc,
@@ -31,7 +29,6 @@ export class VehicleHandlerService {
         recordedAt,
       });
 
-      // Write 2: Upsert into current state table
       await manager.upsert(
         VehicleCurrent,
         {

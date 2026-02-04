@@ -2,7 +2,6 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateColdTables1707000002000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Create meter_telemetry_history table without primary key constraint first
     await queryRunner.query(`
       CREATE TABLE meter_telemetry_history (
         id bigserial NOT NULL,
@@ -14,7 +13,6 @@ export class CreateColdTables1707000002000 implements MigrationInterface {
       )
     `);
 
-    // Create vehicle_telemetry_history table without primary key constraint first
     await queryRunner.query(`
       CREATE TABLE vehicle_telemetry_history (
         id bigserial NOT NULL,
@@ -27,7 +25,6 @@ export class CreateColdTables1707000002000 implements MigrationInterface {
       )
     `);
 
-    // Convert to TimescaleDB hypertables for automatic partitioning
     await queryRunner.query(
       `SELECT create_hypertable('meter_telemetry_history', 'recorded_at', chunk_time_interval => INTERVAL '1 day')`,
     );
@@ -36,7 +33,6 @@ export class CreateColdTables1707000002000 implements MigrationInterface {
       `SELECT create_hypertable('vehicle_telemetry_history', 'recorded_at', chunk_time_interval => INTERVAL '1 day')`,
     );
 
-    // Add composite primary keys after hypertable creation
     await queryRunner.query(
       `ALTER TABLE meter_telemetry_history ADD CONSTRAINT meter_telemetry_history_pkey PRIMARY KEY (id, recorded_at)`,
     );
@@ -45,7 +41,6 @@ export class CreateColdTables1707000002000 implements MigrationInterface {
       `ALTER TABLE vehicle_telemetry_history ADD CONSTRAINT vehicle_telemetry_history_pkey PRIMARY KEY (id, recorded_at)`,
     );
 
-    // Enable compression for older data (optional but recommended)
     await queryRunner.query(
       `ALTER TABLE meter_telemetry_history SET (
         timescaledb.compress,
@@ -60,7 +55,6 @@ export class CreateColdTables1707000002000 implements MigrationInterface {
       )`,
     );
 
-    // Add compression policy - compress data older than 7 days
     await queryRunner.query(
       `SELECT add_compression_policy('meter_telemetry_history', INTERVAL '7 days')`,
     );

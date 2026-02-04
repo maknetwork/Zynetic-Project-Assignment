@@ -7,7 +7,6 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
-  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -16,14 +15,11 @@ async function bootstrap() {
     }),
   );
 
-  // API prefix
   const apiPrefix = process.env.API_PREFIX || '/v1';
   app.setGlobalPrefix(apiPrefix);
 
-  // CORS
   app.enableCors();
 
-  // Swagger documentation
   if (process.env.ENABLE_SWAGGER === 'true') {
     const config = new DocumentBuilder()
       .setTitle('Fleet Telemetry Platform API')
@@ -40,7 +36,6 @@ async function bootstrap() {
     logger.log(`Swagger documentation available at http://localhost:${process.env.PORT}/api`);
   }
 
-  // Health check
   app.use('/health', (req, res) => {
     res.status(200).json({
       status: 'ok',

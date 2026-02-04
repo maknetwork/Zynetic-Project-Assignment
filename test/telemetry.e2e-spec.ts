@@ -88,7 +88,6 @@ describe('Telemetry API (e2e)', () => {
         type: TelemetryType.METER,
         payload: {
           meterId: 'MTR-001',
-          // Missing kwhConsumedAc and voltage
         },
       };
 
@@ -101,7 +100,6 @@ describe('Telemetry API (e2e)', () => {
 
   describe('/v1/analytics/performance/:vehicleId (GET)', () => {
     beforeAll(async () => {
-      // Seed some test data
       const vehicleReading = {
         type: TelemetryType.VEHICLE,
         payload: {

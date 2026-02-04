@@ -23,11 +23,9 @@ export class AnalyticsService {
     startDate?: Date,
     endDate?: Date,
   ): Promise<PerformanceResponseDto> {
-    // Default to last 24 hours if dates not provided
     const end = endDate || new Date();
     const start = startDate || new Date(end.getTime() - 24 * 60 * 60 * 1000);
 
-    // Verify vehicle exists and get meter mapping
     const mapping = await this.mappingRepo.findOne({
       where: { vehicleId },
     });
@@ -36,10 +34,8 @@ export class AnalyticsService {
       throw new NotFoundException(`Vehicle ${vehicleId} not found`);
     }
 
-    // Get hourly breakdown with correlation
     const hourlyData = await this.getHourlyBreakdown(vehicleId, mapping.meterId, start, end);
 
-    // Calculate aggregate metrics
     const energyMetrics = this.calculateEnergyMetrics(hourlyData);
     const batteryMetrics = await this.getBatteryMetrics(vehicleId, start, end);
 

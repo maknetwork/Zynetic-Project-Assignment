@@ -1,24 +1,24 @@
 # Fleet Telemetry Platform
 
-A high-scale telemetry ingestion and analytics system for managing 10,000+ Smart Meters and EV Fleets, processing 14.4 million records daily with real-time analytics capabilities.
+High-scale telemetry ingestion and analytics system for 10,000+ Smart Meters and EV Fleets, processing 14.4 million records daily.
 
-## 📊 Overview
+## Overview
 
-This platform handles two independent data streams arriving every 60 seconds from each device:
-- **Smart Meter Stream**: AC power consumption from the utility grid
-- **EV Vehicle Stream**: DC power delivery and battery metrics
+The platform handles two independent data streams arriving every 60 seconds from each device:
 
-### Key Features
-- ✅ Polymorphic telemetry ingestion (METER/VEHICLE types)
-- ✅ Hot/Cold data separation for optimal read/write performance
-- ✅ Real-time current status queries (<50ms)
-- ✅ 24-hour analytics with correlation (<500ms)
-- ✅ Efficiency ratio calculation (DC delivered / AC consumed)
-- ✅ Handles 14.4M records/day with horizontal scalability
+- Smart Meter Stream: AC power consumption from the utility grid
+- EV Vehicle Stream: DC power delivery and battery metrics
 
----
+### Features
 
-## 🏗️ Architecture
+- Polymorphic telemetry ingestion (METER/VEHICLE types)
+- Hot/Cold data separation for optimal read/write performance
+- Real-time current status queries (<50ms)
+- 24-hour analytics with correlation (<500ms)
+- Efficiency ratio calculation (DC delivered / AC consumed)
+- Handles 14.4M records/day with horizontal scalability
+
+## Architecture
 
 ### System Architecture
 
@@ -61,9 +61,7 @@ Device → Ingestion API → Validation → Dual Write Pattern
                                        └─→ Current State Table (UPSERT)
 ```
 
----
-
-## 🗄️ Database Design
+## Database Design
 
 ### Hot Tables (Current State) - ~20K Rows
 
@@ -94,6 +92,7 @@ vehicle_meter_mapping (10K rows)
 ```
 
 **Write Strategy**: `ON CONFLICT DO UPDATE` (UPSERT)
+
 - Ensures single row per device
 - O(1) lookup for dashboards
 - Supports concurrent updates
@@ -122,6 +121,7 @@ vehicle_telemetry_history (Partitioned by recorded_at)
 ```
 
 **Write Strategy**: `INSERT ONLY` (Append-only)
+
 - Immutable audit trail
 - Optimized for batch inserts
 - No update overhead
@@ -129,6 +129,7 @@ vehicle_telemetry_history (Partitioned by recorded_at)
 ### Partitioning Strategy
 
 **Daily Range Partitions**:
+
 ```sql
 -- Example partitions
 meter_telemetry_history_2026_02_01
@@ -138,6 +139,7 @@ meter_telemetry_history_2026_02_03
 ```
 
 **Benefits**:
+
 - Query only relevant partitions (partition pruning)
 - Easy to archive/drop old data
 - Parallel query execution
@@ -151,10 +153,10 @@ CREATE UNIQUE INDEX idx_meters_current_pk ON meters_current(meter_id);
 CREATE UNIQUE INDEX idx_vehicles_current_pk ON vehicles_current(vehicle_id);
 
 -- Cold tables: Composite indexes for analytics
-CREATE INDEX idx_meter_history_composite 
+CREATE INDEX idx_meter_history_composite
   ON meter_telemetry_history(meter_id, recorded_at DESC);
-  
-CREATE INDEX idx_vehicle_history_composite 
+
+CREATE INDEX idx_vehicle_history_composite
   ON vehicle_telemetry_history(vehicle_id, recorded_at DESC);
 
 -- Mapping table
@@ -163,9 +165,7 @@ CREATE INDEX idx_mapping_meter ON vehicle_meter_mapping(meter_id);
 
 ---
 
-## 🔄 Data Ingestion Strategy
-
-### Polymorphic Ingestion
+##olymorphic Ingestion
 
 **Endpoint**: `POST /v1/telemetry/ingest`
 
@@ -198,18 +198,20 @@ CREATE INDEX idx_mapping_meter ON vehicle_meter_mapping(meter_id);
 
 ### Dual-Write Pattern
 
-**Why Dual Write?**
-- **Hot Table**: Dashboard needs instant current status
-- **Cold Table**: Analytics needs complete historical data
+**Rationale**:
+
+- Hot Table: Dashboard needs instant current status
+- Cold Table: Analytics needs complete historical data
 
 **Implementation**:
+
 ```typescript
 async ingestTelemetry(reading: TelemetryReading) {
   // Use database transaction for atomicity
   await this.dataSource.transaction(async (manager) => {
     // Write 1: Append to history (INSERT)
     await manager.insert(HistoryEntity, reading);
-    
+
     // Write 2: Update current state (UPSERT)
     await manager.upsert(CurrentEntity, reading, {
       conflictPaths: ['deviceId'],
@@ -222,45 +224,45 @@ async ingestTelemetry(reading: TelemetryReading) {
 ### Handling 14.4M Records Daily
 
 **Scale Breakdown**:
+
 - 10,000 devices × 2 streams = 20,000 data sources
 - 60-second intervals = 1,440 readings/day per source
 - Total: 20,000 × 1,440 = **28.8M readings/day** (14.4M per stream)
 
-**Performance Strategies**:
+**Architectural Strategies**:
 
-1. **Batch Processing** (Optional Enhancement)
-   - Buffer 10-second batches
-   - Bulk insert 100+ records at once
-   - Reduces transaction overhead
+1. **Hot/Cold Data Separation**
+   - Hot tables store only current state (20K rows max) for instant dashboard queries
+   - Cold tables store complete history with append-only pattern
+   - Eliminates the need to scan millions of rows for current status
+   - Each table optimized for its specific access pattern
 
-2. **Connection Pooling**
+2. **Dual-Write Transaction Pattern**
+   - Single transaction ensures atomicity across both tables
+   - History table uses INSERT (optimized for append operations)
+   - Current table uses UPSERT (ensures single row per device)
+   - Prevents data inconsistency between hot and cold storage
+
+3. **Connection Pooling**
+   - Configurable pool size prevents connection exhaustion
+   - Connection reuse reduces overhead of establishing new connections
+   - Idle timeout prevents resource leaks
+
    ```typescript
-   // 50 connections for 167 req/sec
-   max: 50,
+   max: 50,  // Adjust based on workload
    min: 10,
    idleTimeoutMillis: 30000
    ```
 
-3. **Asynchronous Processing**
-   - Return `202 Accepted` immediately
-   - Process in background worker
-   - Prevents blocking clients
-
-4. **PostgreSQL Tuning**
-   ```conf
-   shared_buffers = 4GB
-   work_mem = 64MB
-   maintenance_work_mem = 512MB
-   effective_cache_size = 12GB
-   wal_buffers = 16MB
-   checkpoint_completion_target = 0.9
-   ```
+4. **Database Partitioning**
+   - Daily partitions limit query scan range (partition pruning)
+   - Each partition is independently manageable for archival
+   - Reduces index size and maintenance overhead
+   - Enables parallel query execution across partitions
 
 ---
 
-## 📈 Analytics & Correlation
-
-### Endpoint
+## Analytics and
 
 ```
 GET /v1/analytics/performance/:vehicleId
@@ -307,7 +309,7 @@ Query Params: startDate, endDate (defaults to last 24 hours)
 
 ```sql
 -- Query with optimized JOIN and partition pruning
-SELECT 
+SELECT
   v.vehicle_id,
   DATE_TRUNC('hour', v.recorded_at) as hour,
   SUM(v.kwh_delivered_dc) as total_dc_delivered,
@@ -317,12 +319,12 @@ SELECT
   MAX(v.battery_temp) as max_battery_temp,
   MIN(v.battery_temp) as min_battery_temp
 FROM vehicle_telemetry_history v
-INNER JOIN vehicle_meter_mapping vmap 
+INNER JOIN vehicle_meter_mapping vmap
   ON v.vehicle_id = vmap.vehicle_id
-INNER JOIN meter_telemetry_history m 
-  ON m.meter_id = vmap.meter_id 
+INNER JOIN meter_telemetry_history m
+  ON m.meter_id = vmap.meter_id
   -- Correlation window: ±5 seconds for clock drift
-  AND m.recorded_at BETWEEN v.recorded_at - INTERVAL '5 seconds' 
+  AND m.recorded_at BETWEEN v.recorded_at - INTERVAL '5 seconds'
                         AND v.recorded_at + INTERVAL '5 seconds'
 WHERE v.vehicle_id = $1
   AND v.recorded_at >= $2  -- Start date (partition pruning)
@@ -331,30 +333,37 @@ GROUP BY v.vehicle_id, DATE_TRUNC('hour', v.recorded_at)
 ORDER BY hour DESC;
 ```
 
-**Performance Guarantees**:
-- ✅ Uses composite indexes `(vehicle_id, recorded_at)`
-- ✅ Partition pruning limits scan to 24 hours only
-- ✅ Pre-computed mapping eliminates discovery overhead
-- ✅ Index-only scans when possible
-- ✅ Target: <500ms for 1,440 rows (24 hours @ 1-min intervals)
+**Architectural Design Decisions**:
 
-### Correlation Accuracy
+1. **Pre-Configured Mapping Table**
+   - Eliminates runtime discovery of vehicle-meter relationships
+   - Static mapping reduces JOIN complexity
+   - Single source of truth for device associations
 
-**Time Window**: ±5 seconds
-- Accounts for network latency
-- Handles clock drift between devices
-- 99.9% match rate in production
+2. **Time-Window Correlation (±5 seconds)**
+   - Accounts for network latency between device transmissions
+   - Handles minor clock drift between independent devices
+   - Balance between accuracy and match rate
 
-**Edge Cases**:
-- Missing readings: Report as null in hourly breakdown
-- Multiple matches: Use closest timestamp
-- Clock skew >10s: Alert monitoring system
+3. **Composite Indexes**
+   - `(vehicle_id, recorded_at DESC)` enables efficient time-range queries
+   - Index covers both filtering and sorting operations
+   - Reduces need for separate table scans
+
+4. **Partition Pruning**
+   - Date range constraints limit scan to relevant partitions only
+   - Dramatically reduces I/O for time-based analytics
+   - Query planner automatically excludes irrelevant partitions
+
+**Edge Case Handling**:
+
+- Missing readings: Reported as null in hourly breakdown to maintain data integrity
+- Multiple matches within window: Use closest timestamp to minimize correlation error
+- Clock skew detection: System can alert on correlation failures indicating synchronization issues
 
 ---
 
-## 🚀 Quick Start
-
-### Prerequisites
+##rerequisites
 
 - Docker 20.10+
 - Docker Compose 2.0+
@@ -384,15 +393,14 @@ curl http://localhost:3000/health
 ```
 
 **Service Endpoints**:
+
 - API: http://localhost:3000
 - PostgreSQL: localhost:5432
 - Swagger Docs: http://localhost:3000/api
 
 ---
 
-## 🧪 Testing
-
-### Run All Tests
+##un All Tests
 
 ```bash
 # Unit tests
@@ -420,68 +428,67 @@ brew install k6  # macOS
 k6 run test/load/ingestion-load-test.js
 ```
 
-**Expected Performance**:
-- Ingestion throughput: 200+ req/sec
-- Avg response time: <100ms
-- P95 response time: <250ms
-- Analytics query: <500ms
+**Testing Approach**:
+
+- Validates system behavior under expected production load
+- Identifies bottlenecks in ingestion pipeline
+- Measures database write performance under concurrent load
+- Tests partition and index effectiveness
 
 ---
 
 ## 📁 Project Structure
 
-```
-fleet-telemetry-platform/
-├── src/
-│   ├── modules/
-│   │   ├── telemetry/              # Ingestion module
-│   │   │   ├── controllers/
-│   │   │   │   └── telemetry-ingestion.controller.ts
-│   │   │   ├── services/
-│   │   │   │   ├── telemetry-ingestion.service.ts
-│   │   │   │   ├── meter-handler.service.ts
-│   │   │   │   └── vehicle-handler.service.ts
-│   │   │   ├── dto/
-│   │   │   │   ├── meter-reading.dto.ts
-│   │   │   │   ├── vehicle-reading.dto.ts
-│   │   │   │   └── telemetry-request.dto.ts
-│   │   │   ├── entities/
-│   │   │   │   ├── meter-current.entity.ts
-│   │   │   │   ├── meter-history.entity.ts
-│   │   │   │   ├── vehicle-current.entity.ts
-│   │   │   │   ├── vehicle-history.entity.ts
-│   │   │   │   └── vehicle-meter-mapping.entity.ts
-│   │   │   └── telemetry.module.ts
-│   │   ├── analytics/              # Analytics module
-│   │   │   ├── controllers/
-│   │   │   │   └── analytics.controller.ts
-│   │   │   ├── services/
-│   │   │   │   ├── analytics.service.ts
-│   │   │   │   └── correlation.service.ts
-│   │   │   ├── dto/
-│   │   │   │   └── performance-response.dto.ts
-│   │   │   └── analytics.module.ts
-│   │   └── database/               # Database configuration
-│   │       ├── migrations/
-│   │       │   ├── 1707000001-CreateHotTables.ts
-│   │       │   ├── 1707000002-CreateColdTables.ts
-│   │       │   ├── 1707000003-CreatePartitions.ts
-│   │       │   ├── 1707000004-CreateIndexes.ts
-│   │       │   └── 1707000005-SeedMappingData.ts
-│   │       ├── seeds/
-│   │       └── database.module.ts
-│   ├── common/
-│   │   ├── interceptors/
-│   │   ├── filters/
-│   │   ├── validators/
-│   │   └── config/
-│   ├── app.module.ts
-│   └── main.ts
+##rc/
+│ ├── modules/
+│ │ ├── telemetry/ # Ingestion module
+│ │ │ ├── controllers/
+│ │ │ │ └── telemetry-ingestion.controller.ts
+│ │ │ ├── services/
+│ │ │ │ ├── telemetry-ingestion.service.ts
+│ │ │ │ ├── meter-handler.service.ts
+│ │ │ │ └── vehicle-handler.service.ts
+│ │ │ ├── dto/
+│ │ │ │ ├── meter-reading.dto.ts
+│ │ │ │ ├── vehicle-reading.dto.ts
+│ │ │ │ └── telemetry-request.dto.ts
+│ │ │ ├── entities/
+│ │ │ │ ├── meter-current.entity.ts
+│ │ │ │ ├── meter-history.entity.ts
+│ │ │ │ ├── vehicle-current.entity.ts
+│ │ │ │ ├── vehicle-history.entity.ts
+│ │ │ │ └── vehicle-meter-mapping.entity.ts
+│ │ │ └── telemetry.module.ts
+│ │ ├── analytics/ # Analytics module
+│ │ │ ├── controllers/
+│ │ │ │ └── analytics.controller.ts
+│ │ │ ├── services/
+│ │ │ │ ├── analytics.service.ts
+│ │ │ │ └── correlation.service.ts
+│ │ │ ├── dto/
+│ │ │ │ └── performance-response.dto.ts
+│ │ │ └── analytics.module.ts
+│ │ └── database/ # Database configuration
+│ │ ├── migrations/
+│ │ │ ├── 1707000001-CreateHotTables.ts
+│ │ │ ├── 1707000002-CreateColdTables.ts
+│ │ │ ├── 1707000003-CreatePartitions.ts
+│ │ │ ├── 1707000004-CreateIndexes.ts
+│ │ │ └── 1707000005-SeedMappingData.ts
+│ │ ├── seeds/
+│ │ └── database.module.ts
+│ ├── common/
+│ │ ├── interceptors/
+│ │ ├── filters/
+│ │ ├── validators/
+│ │ └── config/
+│ ├── app.module.ts
+│ └── main.ts
 ├── test/
-│   ├── unit/
-│   ├── integration/
-│   ├── e2e/
-│   └── load/
+│ ├── unit/
+│ ├── integration/
+│ ├── e2e/
+│ └── load/
 ├── docker-compose.yml
 ├── Dockerfile
 ├── .env.example
@@ -490,6 +497,7 @@ fleet-telemetry-platform/
 ├── nest-cli.json
 ├── .gitignore
 └── README.md
+
 ```
 
 ---
@@ -498,9 +506,7 @@ fleet-telemetry-platform/
 
 ### Environment Variables
 
-```bash
-# Application
-NODE_ENV=production
+##ENV=production
 PORT=3000
 API_PREFIX=/v1
 
@@ -520,70 +526,57 @@ BATCH_INSERT_SIZE=100
 
 ---
 
-## 📊 Performance Benchmarks
+## 📊 System Design Metrics
 
-### Ingestion Performance
+### Data Volume
 
-| Metric | Target | Actual |
-|--------|--------|--------|
-| Throughput | 200 req/sec | 250+ req/sec |
-| Avg Latency | <100ms | 75ms |
-| P95 Latency | <250ms | 180ms |
-| P99 Latency | <500ms | 320ms |
+| Metric           | Daily Volume   |
+| ---------------- | -------------- |
+| Total Writes     | 28.8M records  |
+| Per Stream       | 14.4M records  |
+| Devices          | 20,000 sources |
+| Reading Interval | 60 seconds     |
 
-### Query Performance
+### Database Growth Pattern
 
-| Query Type | Target | Actual |
-|------------|--------|--------|
-| Current Status | <50ms | 12ms |
-| 24hr Analytics | <500ms | 280ms |
-| 7-day Analytics | <2s | 1.2s |
-
-### Database Metrics
-
-| Metric | Daily Volume |
-|--------|--------------|
-| Writes | 28.8M records |
-| Inserts/sec | 333 TPS |
-| Table Growth | ~2GB/day |
-| Index Size | ~800MB/day |
+- **Hot Tables**: Fixed size (~20K rows) - constant memory footprint
+- **Cold Tables**: Linear growth with data volume
+- **Partitioning**: Daily partitions enable efficient archival and maintenance
+- **Indexing**: Composite indexes on (device_id, timestamp) for query optimization
 
 ---
 
 ## 🔐 Security Considerations
 
-- ✅ Input validation with class-validator
-- ✅ SQL injection prevention (parameterized queries)
-- ✅ Rate limiting (100 req/min per device)
-- ✅ API key authentication (production ready)
-- ✅ HTTPS/TLS encryption
-- ✅ Database connection encryption
+- Input validation with class-validator for request payload verification
+- SQL injection prevention through parameterized queries (TypeORM)
+- Rate limiting capabilities to prevent device abuse
+- API key authentication mechanism for production deployment
+- HTTPS/TLS encryption support for data in transit
+- Database connection encryption support
 
----
+## Scaling Strategies
 
-## 📈 Scaling Strategy
-
-### Horizontal Scaling
+### Horizontal Scaling Approaches
 
 **Application Layer**:
-- Run multiple NestJS instances behind load balancer
-- Stateless design allows easy horizontal scaling
-- Each instance handles ~50 req/sec
+
+- Stateless application design enables multiple instances behind load balancer
+- Each instance maintains independent database connection pool
+- No shared state between application instances
 
 **Database Layer**:
-- **Read Replicas**: Separate analytics from ingestion
-- **Sharding**: Partition by device_id ranges (if >100K devices)
-- **TimescaleDB**: Automatic chunk management and compression
 
-### Vertical Scaling Limits
+- **Read Replicas**: Separate read-heavy analytics queries from write-heavy ingestion
+- **Sharding**: Partition data by device_id ranges for extreme scale (>100K devices)
+- **TimescaleDB**: Alternative for automatic chunk management and compression
 
-| Component | Current | Max Recommended |
-|-----------|---------|-----------------|
-| App CPU | 2 cores | 8 cores |
-| App RAM | 2GB | 8GB |
-| DB CPU | 4 cores | 32 cores |
-| DB RAM | 8GB | 128GB |
-| DB Storage | 1TB | 10TB (then shard) |
+### Vertical Scaling Considerations
+
+- Application instances: CPU-bound for JSON parsing and validation
+- Database server: Memory-bound for maintaining working set and indexes
+- Storage: I/O-bound for write throughput and partition management
+- Connection pooling prevents database connection exhaustion
 
 ---
 
@@ -597,9 +590,7 @@ npm run partition:create-next-month
 
 # Archive partitions older than 1 year
 npm run partition:archive --older-than=365
-```
-
-### Monitoring
+##nitoring
 
 - Application metrics: Prometheus + Grafana
 - Database metrics: pg_stat_statements
@@ -617,20 +608,24 @@ Full API documentation available at:
 
 ## 📝 License
 
+## API Documentation
+
+Full API documentation available at:
+- Swagger UI: http://localhost:3000/api
+- Postman Collection: `docs/postman_collection.json`
+
+## License
+
 MIT
 
----
-
-## 👥 Author
+## Author
 
 Fleet Platform Engineering Team
 
----
+## Built With
 
-## 🙏 Acknowledgments
-
-Built with:
-- [NestJS](https://nestjs.com/) - Progressive Node.js framework
-- [TypeORM](https://typeorm.io/) - ORM for TypeScript
-- [PostgreSQL](https://www.postgresql.org/) - Advanced relational database
-- [TimescaleDB](https://www.timescale.com/) - Time-series extension
+- NestJS: Progressive Node.js framework
+- TypeORM: ORM for TypeScript
+- PostgreSQL: Advanced relational database
+- TimescaleDB:
+```

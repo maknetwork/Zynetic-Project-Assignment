@@ -2,7 +2,6 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateIndexes1707000003000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Composite indexes for meter_telemetry_history
     await queryRunner.query(
       `CREATE INDEX idx_meter_history_composite 
        ON meter_telemetry_history(meter_id, recorded_at DESC)`,
@@ -13,7 +12,6 @@ export class CreateIndexes1707000003000 implements MigrationInterface {
        ON meter_telemetry_history(recorded_at DESC)`,
     );
 
-    // Composite indexes for vehicle_telemetry_history
     await queryRunner.query(
       `CREATE INDEX idx_vehicle_history_composite 
        ON vehicle_telemetry_history(vehicle_id, recorded_at DESC)`,
@@ -24,7 +22,6 @@ export class CreateIndexes1707000003000 implements MigrationInterface {
        ON vehicle_telemetry_history(recorded_at DESC)`,
     );
 
-    // Add retention policy - automatically drop data older than 1 year
     await queryRunner.query(
       `SELECT add_retention_policy('meter_telemetry_history', INTERVAL '365 days')`,
     );

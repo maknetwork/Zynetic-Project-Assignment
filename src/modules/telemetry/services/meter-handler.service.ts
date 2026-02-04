@@ -20,9 +20,7 @@ export class MeterHandlerService {
   async processMeterReading(reading: MeterReadingDto): Promise<void> {
     const recordedAt = new Date(reading.timestamp);
 
-    // Dual-write pattern using transaction
     await this.dataSource.transaction(async (manager) => {
-      // Write 1: Insert into history table (append-only)
       await manager.insert(MeterHistory, {
         meterId: reading.meterId,
         kwhConsumedAc: reading.kwhConsumedAc,
@@ -30,7 +28,6 @@ export class MeterHandlerService {
         recordedAt,
       });
 
-      // Write 2: Upsert into current state table
       await manager.upsert(
         MeterCurrent,
         {

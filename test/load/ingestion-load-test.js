@@ -8,28 +8,30 @@ const errorRate = new Rate('errors');
 // Load test configuration
 export const options = {
   stages: [
-    { duration: '30s', target: 50 },   // Ramp up to 50 RPS
-    { duration: '1m', target: 100 },   // Ramp up to 100 RPS
-    { duration: '2m', target: 200 },   // Peak at 200 RPS (simulates 10K devices)
-    { duration: '1m', target: 100 },   // Ramp down
-    { duration: '30s', target: 0 },    // Cool down
+    { duration: '30s', target: 50 }, // Ramp up to 50 RPS
+    { duration: '1m', target: 100 }, // Ramp up to 100 RPS
+    { duration: '2m', target: 200 }, // Peak at 200 RPS (simulates 10K devices)
+    { duration: '1m', target: 100 }, // Ramp down
+    { duration: '30s', target: 0 }, // Cool down
   ],
   thresholds: {
     http_req_duration: ['p(95)<250', 'p(99)<500'], // 95% < 250ms, 99% < 500ms
-    http_req_failed: ['rate<0.01'],                 // Error rate < 1%
+    http_req_failed: ['rate<0.01'], // Error rate < 1%
     errors: ['rate<0.01'],
   },
 };
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
 
-// Generate random device IDs
+// Generate random device IDs (matching seeded data: VEH-0001 to VEH-10000)
 function randomMeterId() {
-  return `MTR-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
+  const id = Math.floor(Math.random() * 10000) + 1; // 1 to 10000
+  return `MTR-${String(id).padStart(4, '0')}`;
 }
 
 function randomVehicleId() {
-  return `VEH-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
+  const id = Math.floor(Math.random() * 10000) + 1; // 1 to 10000
+  return `VEH-${String(id).padStart(4, '0')}`;
 }
 
 // Test scenarios

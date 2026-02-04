@@ -20,7 +20,7 @@ import { VehicleMeterMapping } from '../telemetry/entities/vehicle-meter-mapping
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_NAME'),
         entities: [MeterCurrent, MeterHistory, VehicleCurrent, VehicleHistory, VehicleMeterMapping],
-        synchronize: false, // Always use migrations in production
+        synchronize: false,
         logging: configService.get('NODE_ENV') === 'development' ? ['error', 'warn'] : false,
         extra: {
           max: configService.get<number>('DB_POOL_MAX') || 50,
