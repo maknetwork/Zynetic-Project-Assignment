@@ -10,9 +10,7 @@ export class SeedMappingData1707000004000 implements MigrationInterface {
       const vehicleId = `VEH-${String(i).padStart(4, '0')}`;
       const meterId = `MTR-${String(i).padStart(4, '0')}`;
       const location = `Charging Station ${i} - Zone ${Math.ceil(i / 100)}`;
-      mappings.push(
-        `('${vehicleId}', '${meterId}', '${location}', CURRENT_TIMESTAMP)`,
-      );
+      mappings.push(`('${vehicleId}', '${meterId}', '${location}', CURRENT_TIMESTAMP)`);
     }
 
     // Insert in batches of 100

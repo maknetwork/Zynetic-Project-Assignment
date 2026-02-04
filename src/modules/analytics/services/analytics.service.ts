@@ -72,10 +72,9 @@ export class AnalyticsService {
           ELSE 0 
         END as efficiency
       FROM vehicle_telemetry_history v
-      LEFT JOIN meter_telemetry_history m 
+      INNER JOIN meter_telemetry_history m 
         ON m.meter_id = $2
-        AND m.recorded_at BETWEEN v.recorded_at - INTERVAL '5 seconds' 
-                              AND v.recorded_at + INTERVAL '5 seconds'
+        AND m.recorded_at = v.recorded_at
       WHERE v.vehicle_id = $1
         AND v.recorded_at >= $3
         AND v.recorded_at < $4
@@ -83,12 +82,7 @@ export class AnalyticsService {
       ORDER BY hour DESC
     `;
 
-    const results = await this.mappingRepo.query(query, [
-      vehicleId,
-      meterId,
-      startDate,
-      endDate,
-    ]);
+    const results = await this.mappingRepo.query(query, [vehicleId, meterId, startDate, endDate]);
 
     return results.map((row) => ({
       hour: row.hour.toISOString(),

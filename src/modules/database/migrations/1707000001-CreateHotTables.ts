@@ -117,9 +117,7 @@ export class CreateHotTables1707000001000 implements MigrationInterface {
       true,
     );
 
-    await queryRunner.query(
-      `CREATE INDEX idx_mapping_meter_id ON vehicle_meter_mapping(meter_id)`,
-    );
+    await queryRunner.query(`CREATE INDEX idx_mapping_meter_id ON vehicle_meter_mapping(meter_id)`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
