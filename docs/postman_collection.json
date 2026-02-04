@@ -1,0 +1,110 @@
+{
+  "info": {
+    "name": "Fleet Telemetry Platform API",
+    "description": "API collection for Fleet Telemetry Platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Telemetry Ingestion",
+      "item": [
+        {
+          "name": "Ingest Meter Reading",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"METER\",\n  \"payload\": {\n    \"meterId\": \"MTR-001\",\n    \"kwhConsumedAc\": 125.5,\n    \"voltage\": 240.2,\n    \"timestamp\": \"{{$isoTimestamp}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/telemetry/ingest",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "telemetry", "ingest"]
+            }
+          }
+        },
+        {
+          "name": "Ingest Vehicle Reading",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"VEHICLE\",\n  \"payload\": {\n    \"vehicleId\": \"VEH-001\",\n    \"soc\": 75,\n    \"kwhDeliveredDc\": 105.2,\n    \"batteryTemp\": 32.5,\n    \"timestamp\": \"{{$isoTimestamp}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/telemetry/ingest",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "telemetry", "ingest"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Get Performance Analytics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/v1/analytics/performance/VEH-001",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "analytics", "performance", "VEH-001"]
+            }
+          }
+        },
+        {
+          "name": "Get Performance Analytics with Date Range",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/v1/analytics/performance/VEH-001?startDate=2026-02-03T00:00:00Z&endDate=2026-02-04T00:00:00Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "analytics", "performance", "VEH-001"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-02-03T00:00:00Z"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-02-04T00:00:00Z"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    }
+  ]
+}
