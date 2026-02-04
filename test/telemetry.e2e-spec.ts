@@ -100,6 +100,20 @@ describe('Telemetry API (e2e)', () => {
 
   describe('/v1/analytics/performance/:vehicleId (GET)', () => {
     beforeAll(async () => {
+      const timestamp = new Date().toISOString();
+
+      // Ingest meter data first
+      const meterReading = {
+        type: TelemetryType.METER,
+        payload: {
+          meterId: 'MTR-001',
+          kwhConsumedAc: 125.0,
+          voltage: 240.0,
+          timestamp,
+        },
+      };
+
+      // Ingest vehicle data with same timestamp
       const vehicleReading = {
         type: TelemetryType.VEHICLE,
         payload: {
@@ -107,10 +121,11 @@ describe('Telemetry API (e2e)', () => {
           soc: 80,
           kwhDeliveredDc: 100.0,
           batteryTemp: 30.0,
-          timestamp: new Date().toISOString(),
+          timestamp,
         },
       };
 
+      await request(app.getHttpServer()).post('/v1/telemetry/ingest').send(meterReading);
       await request(app.getHttpServer()).post('/v1/telemetry/ingest').send(vehicleReading);
     });
 

@@ -21,7 +21,7 @@ export const options = {
   },
 };
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
+const BASE_URL = __ENV.BASE_URL || 'http://38.242.203.89:8989';
 
 // Generate random device IDs (matching seeded data: VEH-0001 to VEH-10000)
 function randomMeterId() {
