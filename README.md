@@ -17,6 +17,7 @@ The system uses a dual-table pattern to address two conflicting requirements:
 This separation means:
 
 This separation means:
+
 - Dashboard queries are fast because they only touch ~20K rows
 - Historical analytics have a complete record without gaps
 - Write operations are optimized for each use case (UPSERT vs INSERT)
@@ -24,6 +25,7 @@ This separation means:
 ### Handling the Daily Volume
 
 10,000 devices sending two types of readings every 60 seconds works out to:
+
 - 20,000 data points per minute
 - 28.8 million records per day (14.4M per stream)
 
@@ -46,6 +48,7 @@ The fundamental problem: meter readings and vehicle readings arrive independentl
 When generating analytics, the query joins vehicle history with meter history through this mapping, using a time window of ±5 seconds to account for:
 
 When generating analytics, the query joins vehicle history with meter history through this mapping, using a time window of ±5 seconds to account for:
+
 - Network latency differences between devices
 - Minor clock drift between independent systems
 - Variable transmission timing
@@ -78,7 +81,8 @@ Several things make this performant:
 3. **Composite indexes cover the query** - `(vehicle_id, recorded_at)` on both tables means the database can use index-only scans
 4. **Time window is narrow** - ±5 seconds limits the number of meter records that need to be checked for each vehicle record
 
-**Tradeoffs**: 
+**Tradeoffs**:
+
 - If readings arrive >5 seconds apart, they won't correlate. In practice, this is rare but monitorable.
 - The BETWEEN clause on timestamps prevents the use of certain index optimizations, but given the narrow window, this is acceptable.
 - Aggregating by hour reduces output size but loses minute-level granularity.
@@ -88,16 +92,21 @@ Several things make this performant:
 You might wonder why we don't use a message queue or streaming system. The answer comes down to operational complexity vs. actual requirements.
 
 Requirements analysis:
+
 - Data arrives every 60 seconds (not subsecond)
 - Analytics are queried on-demand, not continuously
 - Dashboards showing "current" state can tolerate a few seconds of lag
 - Historical correlation happens after the fact
 
 Given this, HTTP + PostgreSQL provides:
+
 - Simpler architecture (fewer moving parts)
 - Built-in durability (no separate message persistence)
 - Mature operational tooling
 - SQL expressiveness for correlation logic
 
 A streaming system would add complexity without solving a problem we actually have. If requirements changed to subsecond intervals or real-time alerting, that calculus would shift.
+
+```
+
 ```
